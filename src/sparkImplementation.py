@@ -14,8 +14,8 @@ stopWords.add("")
 # conf = SparkConf().setMaster("local[*]").setAppName("TFIDF Query Search")
 # sc = SparkContext(conf=conf)
 
-sc = SparkContext(master="local[4]")
-sc.setLogLevel('INFO')
+sc = SparkContext(master="local[8]")
+# sc.setLogLevel('INFO')
 ps = SnowballStemmer("english")
 
 
@@ -61,19 +61,19 @@ def parallel_tfidf(document_count, term_frequency, document_frequency):
     print("hi")
 
 
-def query(query_text, tfidf_rdd, top_result_count):
-    tokens = sc.parallelize(tokenize(query_text)).map(lambda x: (x, 1)).collectAsMap()
+def query(query_text, tfidf, top_result_count):
+    tokens = sc.parallelize(stem(tokenize(query_text))).map(lambda x: (x, 1)).collectAsMap()
     broadcast_tokens = sc.broadcast(tokens)
 
-    joined_tfidf = tfidf_rdd \
+    joined_tfidf = tfidf \
         .map(lambda (k, v): (k, broadcast_tokens.value.get(k, '-'), v)) \
         .filter(lambda (a, b, c): b != '-')
 
-    scount = joined_tfidf \
+    s_count = joined_tfidf \
         .map(lambda a: a[2]) \
-        .aggregateByKey((0, 0), (lambda (acc, value): (acc[0] + value, acc[1] + 1)),
-                        (lambda (acc1, acc2): (acc1[0] + acc2[0], acc1[1] + acc2[1])))
-    return scount.map(lambda (k, v): (v[0] * v[1] / len(tokens), k)).top(top_result_count)
+        .aggregateByKey((0, 0), (lambda (acc, value): (acc[0] + value, acc[1] + 1)), (lambda (acc1, acc2): (acc1[0] + acc2[0], acc1[1] + acc2[1])))
+
+    return s_count.map(lambda (k, v): (v[0] * v[1] / len(tokens), k)).top(top_result_count)
 
 
 if __name__ == "__main__":
@@ -81,7 +81,7 @@ if __name__ == "__main__":
     # sc.setLogLevel("INFO")
 
     # read input text files present in the directory to RDD
-    articles = sc.wholeTextFiles("dataset2/")
+    articles = sc.wholeTextFiles("dataset/")
 
     start_time = time.time()
     # collect the RDD to a list
@@ -121,10 +121,10 @@ if __name__ == "__main__":
 
     # TFIDF RDD
     tf_idf_output = tf_idf(article_count, term_frequencyRDD, document_frequencyRDD)
-    # print('TF_IDF sample(5)' + str(tf_idf_output[:5]))
+    print('TF_IDF sample(5)' + str(tf_idf_output[:5]))
 
     print("Elapsed time: %.4fs" % (time.time() - start_time))
     # TF-IDF scores of Corpus
-    # tfidf_rdd = sc.parallelize(tf_idf_output).map(lambda x: (x['term'], (x['doc'], x['score'])))
-
-    # print "Rank" + str(query("Ink helps drive democracy in Asia", tfidf_rdd, 5))
+    tfidf_rdd = sc.parallelize(tf_idf_output).map(lambda x: (x['term'], (x['doc'], x['score'])))
+    print "TFIDF_RDD COUNT: " + str(tfidf_rdd.count())
+    # print json.dumps(query("Ink helps drive democracy in Asia", tfidf_rdd, 5).count())

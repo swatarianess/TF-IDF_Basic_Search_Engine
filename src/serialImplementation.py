@@ -1,14 +1,13 @@
-import re
+import json
 import os
+import re
+import time
 from argparse import ArgumentParser
 from collections import Counter
-import json
-from nltk.stem import SnowballStemmer
-from nltk.corpus import stopwords
-import operator
-import hashlib
+
 import numpy as np
-import time
+from nltk.corpus import stopwords
+from nltk.stem import SnowballStemmer
 
 stopWords = set(stopwords.words('english'))
 stopWords.add("")
@@ -17,6 +16,14 @@ word_corpus = []
 
 
 def tokenize(s):
+    # type: (str) -> list
+    """
+            Removes stop-words, and changes words to lowercase.
+
+    :rtype: list()
+    :param s: String containing words in a document
+    :return: Returns list of strings
+    """
     words = re.split("\W+", s.lower())
     result = []
 
@@ -29,6 +36,7 @@ def tokenize(s):
 
 
 def stemWord(s):
+    # type: (list) -> list
     words = s
     result = []
 
@@ -41,27 +49,39 @@ def stemWord(s):
 
 
 def cleanDocuments(document_map):
+    """
+            Tokenizes, and extracts base of words. It also removes stopwords from each document's content.
+
+    :param document_map: Dictionary of documents with their content
+    :return: Returns dictionary of documents
+    """
     result = {}
     for key, value in document_map.items():
         result[key] = stemWord(tokenize(value))
     return result
 
 
-def computeTF(documents):
+def computeTFDocument2(documents):
+    # type: #(dict) -> list[tuple[str,list[tuple[str,int]]]]
     """
-        Computes the term frequency of terms in the corpus
-    :param documents: A dictionary of the frequency of terms in the whole corpus
-    :return: A list of pairs of term frequencies in the form of (term, term_frequency)
+
+    :param documents:
+    :return:
     """
-    flattened = [val for sublist in documents.values() for val in sublist]
-    result = {}
+    result = []
+    document_sizes = {}
 
-    # Key = document_name, value = array of words
-    for key, value in documents.items():
-        result[key] = Counter(value).items()
+    for document_name in documents:
+        document_sizes[document_name] = len(documents.get(document_name))
 
-    return Counter(flattened).items()
-    # return result
+    for document_name in documents:  # Iterates over documents
+        result.append((document_name, []))
+        for word in documents.get(document_name):  # Iterates over words in document
+            if word not in result:
+                result[document_name] = (word, 1 / document_sizes[document_name])
+            else:
+                result[document_name] = (word, result[document_name] / document_sizes.get(document_name))
+    return result
 
 
 def computeTFDocument(documents):
@@ -74,6 +94,7 @@ def computeTFDocument(documents):
     result = []
     for document_name in documents:
         result.append((document_name, Counter(documents[document_name]).items()))
+
     return result
 
 
@@ -81,6 +102,7 @@ def computeIDF(document_corpus):
     # type: (dict) -> dict
     """
         Computes the inverse document frequency
+
     :rtype: dict(str, int)
     :param document_corpus: Collection of documents in the corpus
     :return: A dictionary
@@ -99,36 +121,13 @@ def computeIDF(document_corpus):
     return result
 
 
-def compute_tfidf(number_of_documents, term_frequency, document_frequency):
-    # type: (int, list, dict) -> list[dict[str,[float,int]]]
-
-    # List[Dict[str, Union[Union[float, int], Any]]]
-    """
-        Calculates tfidf for the whole corpus
-    :rtype: list[dict[str,[float,int]]]
-    :param number_of_documents: The number of documents in the corpus
-    :param term_frequency: A list of tuples representing term frequencies in the corpus
-    :param document_frequency: A list of tuples: [{term, df_score}]
-    :return: Returns a list of tuples: [{term: term_name, score: tfidf_score}]
-    """
-
-    results = []
-    for key, value in term_frequency:
-        term = key
-        tf_idf_score = 0
-        document_frequency_of_term = document_frequency[term]
-        if document_frequency_of_term > 0:
-            tf_idf_score = float(value) * np.log(number_of_documents / document_frequency_of_term)
-        results.append({"score": tf_idf_score, "term": term})
-    return results
-
-
 def compute_tfidfDocuments(number_of_documents, term_frequency, document_frequency):
     # type: (int, list, dict) -> list[dict[str,[float,int]]]
 
     # List[Dict[str, Union[Union[float, int], Any]]]
     """
-        Calculates tfidf for the whole corpus
+        Calculates tfidf scores for all distinct terms in the corpus
+
     :rtype: list[dict[str,[float,int]]]
     :param number_of_documents: The number of documents in the corpus
     :param term_frequency: A list of tuples representing term frequencies in the corpus
@@ -152,6 +151,7 @@ def read_document_content(path):
     # type: (str) -> str
     """
         Reads the file from the supplied path
+
     :rtype: str
     :param path: A path to the document file
     :return: A string containing the content of the document
@@ -173,6 +173,7 @@ def load_documents(path):
     # type: (str) -> dict
     """
         Creates dictionary from all files in folder
+
     :param path: The path to the folder containing all .txt files
     :return: Returns a dictionary in the form of dict(str, str)
     """
@@ -188,6 +189,47 @@ def load_documents(path):
         print("Path does not exist, exiting...")
         exit(1)
     return temp_dictionary
+
+
+def computeTFQuery(query):
+    words = stemWord(tokenize(query))
+    return dict(Counter(words).items())
+
+
+def computeTFIDFQuery(question, idf_corpus):
+    # type: (str, dict) -> dict
+    result = {}
+    tf_query = computeTFQuery(question)
+
+    for word in tf_query:
+        score = 0
+        if word not in idf_corpus.keys():
+            pass
+        else:
+            for term in idf_corpus.keys():
+                score = tf_query[word] * idf_corpus[term]
+        result[word] = score
+
+    return result
+
+
+def computeDotProduct(query_vector, document_vector):
+    """
+
+    :param query_vector: Dictionary of tfidf weights for terms in a query
+    :param document_vector: Dictionary of tfidf weights for terms in document
+    """
+    result = {}
+
+    numerator = 0
+    normalized_query = 0
+    normalized_document = 0
+
+    for word, value in query_vector.items():
+        if word in document_vector:
+            result[word] = 88888
+
+    return result
 
 
 if __name__ == "__main__":
@@ -262,3 +304,18 @@ if __name__ == "__main__":
     print ""
 
     print("Elapsed time: %.4fs" % (time.time() - start_time_total))
+
+    query = str(input('Please enter query: \n'))
+    print "Query: " + query
+
+    tf_query = computeTFQuery(query)
+    tfidf_query = computeTFIDFQuery(query, document_freq)
+
+    print ""
+
+    print "TF Query: " + str(tf_query)
+    print "TF-IDF Query: " + str(tfidf_query)
+
+    d_product = computeDotProduct(query_vector=tfidf_query, document_vector=tfidf)
+    print "DotProduct: " + str(d_product)
+    print "Done.."

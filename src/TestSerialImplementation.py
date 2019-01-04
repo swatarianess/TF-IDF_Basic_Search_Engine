@@ -15,7 +15,7 @@ def check_against_results(tuple_list, collection):
 def check_tf_results(tuple_list, tf_list):
     counter = 0
     for t in tuple_list:
-        if t in tf_list[0]:
+        if t in tf_list[0]:  # presume that first item in list is 001.txt
             counter += 1
     return counter
 
@@ -23,11 +23,11 @@ def check_tf_results(tuple_list, tf_list):
 class TestSerialImplementation(unittest.TestCase):
     test_case_TF_tuples_in_doc1 = [("limit", 0), ("person", 1), ("four", 0), ("yellow", 1), ("dissuading", 0)]
     test_case_IDF_tuples = [("limit", 6), ("person", 10), ("four", 7), ("yellow", 1), ("dissuading", 2)]
-    test_case_TFIDF_tuples = [{'term': 'limit', 'score': 14.55609079175885},
-                              {'term': 'person', 'score': 24.141568686511505},
-                              {'term': 'four', 'score': 13.621371043387192},
+    test_case_TFIDF_tuples = [{'term': 'limit', 'score': 2.0794415416798357},
+                              {'term': 'person', 'score': 1.6094379124341003},
+                              {'term': 'four', 'score': 1.9459101490553132},
                               {'term': 'yellow', 'score': 3.912023005428146},
-                              {'term': 'dissuad', 'score': 6.437751649736401}]
+                              {'term': 'dissuad', 'score': 3.2188758248682006}]
     term_frequency_dict = list()
     document_freq = dict()
     tfidf = list()
@@ -53,17 +53,36 @@ class TestSerialImplementation(unittest.TestCase):
         self.document_freq = serialImpl.computeIDF(serialImpl.documents)
         self.assertEqual(2845, len(self.document_freq))
         self.assertEqual(4, check_against_results(self.test_case_IDF_tuples, self.document_freq.items()))
+
         print("IDF: " + str(len(self.document_freq.items())))
 
     def test_tfidf(self):
-        self.term_frequency_dict = serialImpl.computeTF(serialImpl.documents)
+        self.term_frequency_dict = serialImpl.computeTFDocument(serialImpl.documents)
         self.document_freq = serialImpl.computeIDF(serialImpl.documents)
-        self.tfidf = serialImpl.compute_tfidf(len(serialImpl.documents), self.term_frequency_dict, self.document_freq)
-        self.assertEqual(2845, len(self.tfidf))
+        self.tfidf = serialImpl.compute_tfidfDocuments(len(serialImpl.documents), self.term_frequency_dict, self.document_freq)
+        self.assertEqual(7992, len(self.tfidf))
         self.assertEqual(5, check_against_results(self.test_case_TFIDF_tuples, self.tfidf))
-        print json.dumps(self.tfidf)
 
         print("TFIDF: " + str(len(self.tfidf)))
+
+    def test_computeTFQuery(self):
+        print serialImpl.computeTFQuery("Ink helps drive democracy in Asia")
+
+    def test_computeTFIDFQuery(self):
+        docs = serialImpl.documents
+        self.term_frequency_dict = serialImpl.computeTFDocument(docs)
+        self.document_freq = serialImpl.computeIDF(docs)
+        self.tfidf = serialImpl.compute_tfidfDocuments(len(serialImpl.documents), self.term_frequency_dict, self.document_freq)
+
+        print "TFIDF_Query: " + str(serialImpl.computeTFIDFQuery("Ink bananas helps amber drive drive democracy in Asia", self.document_freq))
+
+    def test_computeDotProduct(self):
+        docs = serialImpl.documents
+
+    def test_computeTFDocument2(self):
+        docs = serialImpl.documents
+        a = serialImpl.computeTFDocument2(docs)
+        print str(json.dumps(a))
 
 
 if __name__ == '__main__':
