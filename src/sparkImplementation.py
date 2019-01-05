@@ -14,7 +14,7 @@ stopWords.add("")
 # conf = SparkConf().setMaster("local[*]").setAppName("TFIDF Query Search")
 # sc = SparkContext(conf=conf)
 
-sc = SparkContext(master="local[8]")
+sc = SparkContext(master="local[*]")
 # sc.setLogLevel('INFO')
 ps = SnowballStemmer("english")
 
@@ -61,24 +61,24 @@ def parallel_tfidf(document_count, term_frequency, document_frequency):
     print("hi")
 
 
-def query(query_text, tfidf, top_result_count):
+def query(query_text, top_result_count):
     tokens = sc.parallelize(stem(tokenize(query_text))).map(lambda x: (x, 1)).collectAsMap()
     broadcast_tokens = sc.broadcast(tokens)
 
-    joined_tfidf = tfidf \
+    joined_tfidf = tfidf_rdd \
         .map(lambda (k, v): (k, broadcast_tokens.value.get(k, '-'), v)) \
         .filter(lambda (a, b, c): b != '-')
 
-    s_count = joined_tfidf \
+    scount = joined_tfidf \
         .map(lambda a: a[2]) \
         .aggregateByKey((0, 0), (lambda (acc, value): (acc[0] + value, acc[1] + 1)), (lambda (acc1, acc2): (acc1[0] + acc2[0], acc1[1] + acc2[1])))
 
-    return s_count.map(lambda (k, v): (v[0] * v[1] / len(tokens), k)).top(top_result_count)
+    return scount.map(lambda (k, v): (v[0] * v[1] / len(tokens), k)).top(top_result_count)
 
 
 if __name__ == "__main__":
     # create Spark context with Spark configuration
-    # sc.setLogLevel("INFO")
+    sc.setLogLevel("INFO")
 
     # read input text files present in the directory to RDD
     articles = sc.wholeTextFiles("dataset/")
@@ -127,4 +127,6 @@ if __name__ == "__main__":
     # TF-IDF scores of Corpus
     tfidf_rdd = sc.parallelize(tf_idf_output).map(lambda x: (x['term'], (x['doc'], x['score'])))
     print "TFIDF_RDD COUNT: " + str(tfidf_rdd.count())
-    # print json.dumps(query("Ink helps drive democracy in Asia", tfidf_rdd, 5).count())
+
+    # input_query = input('Enter Query: ')
+    query("Ink helps drive democracy in Asia", 5)

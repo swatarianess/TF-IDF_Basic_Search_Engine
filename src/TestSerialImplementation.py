@@ -43,8 +43,8 @@ class TestSerialImplementation(unittest.TestCase):
         self.assertEqual(len(serialImpl.documents), 50)
 
     def test_tf(self):
-        self.term_frequency_dict = serialImpl.computeTFDocument(serialImpl.documents)
-        self.assertEqual(50, len(self.term_frequency_dict))
+        self.term_frequency_dict = serialImpl.computeTFProper(serialImpl.documents)
+        self.assertEqual(20, len(self.term_frequency_dict))
         self.assertEqual(0, check_tf_results(self.test_case_TF_tuples_in_doc1, self.term_frequency_dict))
         print json.dumps(self.term_frequency_dict)
         print("TF Size: " + str(len(self.term_frequency_dict)))
@@ -57,7 +57,7 @@ class TestSerialImplementation(unittest.TestCase):
         print("IDF: " + str(len(self.document_freq.items())))
 
     def test_tfidf(self):
-        self.term_frequency_dict = serialImpl.computeTFDocument(serialImpl.documents)
+        self.term_frequency_dict = serialImpl.computeTFProper(serialImpl.documents)
         self.document_freq = serialImpl.computeIDF(serialImpl.documents)
         self.tfidf = serialImpl.compute_tfidfDocuments(len(serialImpl.documents), self.term_frequency_dict, self.document_freq)
         self.assertEqual(7992, len(self.tfidf))
@@ -70,19 +70,16 @@ class TestSerialImplementation(unittest.TestCase):
 
     def test_computeTFIDFQuery(self):
         docs = serialImpl.documents
-        self.term_frequency_dict = serialImpl.computeTFDocument(docs)
+        self.term_frequency_dict = serialImpl.computeTFProper(docs)
         self.document_freq = serialImpl.computeIDF(docs)
         self.tfidf = serialImpl.compute_tfidfDocuments(len(serialImpl.documents), self.term_frequency_dict, self.document_freq)
 
-        print "TFIDF_Query: " + str(serialImpl.computeTFIDFQuery("Ink bananas helps amber drive drive democracy in Asia", self.document_freq))
+        # print "TFIDF_Query: " + str(serialImpl.computeTFIDFQuery("Ink bananas helps amber drive drive democracy in Asia", self.document_freq))
 
     def test_computeDotProduct(self):
         docs = serialImpl.documents
-
-    def test_computeTFDocument2(self):
-        docs = serialImpl.documents
-        a = serialImpl.computeTFDocument2(docs)
-        print str(json.dumps(a))
+        res = serialImpl.computeTFProper(docs)
+        print res
 
 
 if __name__ == '__main__':
