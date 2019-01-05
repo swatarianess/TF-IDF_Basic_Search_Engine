@@ -129,4 +129,4 @@ if __name__ == "__main__":
     print "TFIDF_RDD COUNT: " + str(tfidf_rdd.count())
 
     # input_query = input('Enter Query: ')
-    query("Ink helps drive democracy in Asia", 5)
+    # query("Ink helps drive democracy in Asia", 5)

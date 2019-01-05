@@ -15,7 +15,7 @@ from nltk.stem import SnowballStemmer
 stopWords = set(stopwords.words('english'))
 stopWords.add("")
 ps = SnowballStemmer("english")
-pp = pprint.PrettyPrinter(indent=4)
+pp = pprint.PrettyPrinter(indent=1, depth=3)
 
 word_corpus = []
 postings = dict()  # example { "potato" : ["001.txt", "012.txt", "021.txt", ... ], "another": [...], ... }
@@ -68,7 +68,7 @@ def cleanDocuments(document_map):
     return result
 
 
-def computeTFProper(documents):
+def computeTF(documents):
     # type: (dict) -> dict[tuple[str,list[str,int]]]
     """
         Calculate the term frequency
@@ -81,7 +81,7 @@ def computeTFProper(documents):
         distinct_terms = set(document_terms)
         result[document_name] = []
         for term in distinct_terms:
-            score = (float(document_terms.count(term)) / len(document_terms))
+            score = float(document_terms.count(term)) / len(document_terms)  # Normalized TF score
             result[document_name].append((term, score))
 
     return result
@@ -114,15 +114,12 @@ def computeIDF(documents):
 
 def compute_tfidfDocuments(number_of_documents, term_frequency, document_frequency):
     # type: (int, dict, dict) -> dict[list]
-    # type: #(int, dict, dict) -> list[dict[str,[float,int]]]
-
-    # List[Dict[str, Union[Union[float, int], Any]]]
     """
         Calculates tfidf scores for all distinct terms in the corpus
 
     :rtype: list[dict[str,[float,int]]]
     :param number_of_documents: The number of documents in the corpus
-    :param term_frequency: A list of tuples representing term frequencies in the corpus
+    :param tf: A list of tuples representing term frequencies in the corpus
     :param document_frequency: A list of tuples: [{term, df_score}]
     :return: Returns a dictionary listed tuples: { "001.txt": [("sector", 1.6094379), ("embassi", 2.302585), ()]}
     """
@@ -130,18 +127,16 @@ def compute_tfidfDocuments(number_of_documents, term_frequency, document_frequen
     for key, value in term_frequency.items():
         for word in value:
             term = word[0]
-            term_value = word[1]
+            tf = word[1]
             tf_idf_score = 0
             document_frequency_of_term = document_frequency[term]
             if document_frequency_of_term > 0:
-                idf = math.log(float(number_of_documents) / document_frequency_of_term) + 1.0
-                tf_idf_score = term_value * idf
-
+                idf = math.log10(1.0 + (float(number_of_documents) / document_frequency_of_term))
+                tf_idf_score = tf * idf
             if key in results:
                 results.get(key).append((term, tf_idf_score))
             else:
                 results[key] = [(term, tf_idf_score)]
-
     return results
 
 
@@ -190,23 +185,26 @@ def load_documents(path):
 
 
 def computeTFQuery(query):
-    words = query
-    return dict(Counter(words).items())
+    # type: (list) -> dict
+    result = {}
+    distinct_terms = set(query)
+
+    for term in distinct_terms:
+        result[term] = float(query.count(term))
+    return result
 
 
 def computeTFIDFQuery(tf_query, idf_corpus):
     # type: (dict, dict) -> dict
     result = {}
-
     for word in tf_query:
         score = 0
         if word not in idf_corpus.keys():
             result[word] = 0
         else:
             for term in idf_corpus.keys():
-                score = (1 + math.log(tf_query[word])) * idf_corpus[term]
+                score = tf_query[word] * idf_corpus[term]
         result[word] = score
-
     return result
 
 
@@ -216,19 +214,19 @@ def retrievePotentialDocuments(query):
     :param query:
     :return:
     """
-    query_process = {}
+    result = {}
 
     for term in query:
-        query_process[term] = postings.get(term)
+        result[term] = postings.get(term)
 
-    return query_process
+    return result
 
 
 def computeDocumentScore(query_vector, document_vector, relevant_documents):
     result = {}
 
     for doc_name in relevant_documents:  # Iterate through documents relevant to query
-        print '=================== %s ===================' % doc_name
+        # print '=================== %s ===================' % doc_name
         numerator = 0.0
         denominator_q = 0.0
         denominator_d = 0.0
@@ -237,33 +235,34 @@ def computeDocumentScore(query_vector, document_vector, relevant_documents):
                 # query_vector[term[0]] = Term in query
                 # term[1] = Term in document
                 numerator += float(query_vector[term[0]] * term[1])  # q_i * d_i
-                denominator_d += float(query_vector[term[0]] ** 2)   # q^2
-                denominator_q += float(term[1] ** 2)                 # d^2
-                print "D_i term: " + str(term)
-                print "Q_i term: " + str(query_vector)
+                denominator_d += float(query_vector[term[0]] ** 2)  # q^2
+                denominator_q += float(term[1] ** 2)  # d^2
+                # print "D_i term: " + str(term)
+                # print "Q_i term: " + str(query_vector)
+                # print ""
         sub_result = np.sqrt(denominator_d) * np.sqrt(denominator_q)  #
-        result[doc_name] = (float(np.sqrt(numerator)) / sub_result)
+        result[doc_name] = float(np.sqrt(numerator)) / sub_result
     print ""
 
     return result
 
 
-def ranking(scores):
+def ranking(scores, topAmount):
     """
         Ranks documents based on their scores i ascending order
     :param scores: ...
     :return: List of tuples containing (document_name, rank_score)
     """
-    return sorted(scores)
+    return sorted(scores, key=lambda x: x[1])[:topAmount]
 
 
-def user_input():
-    input_query = input('Please Enter a query: ')
-    tf_query = computeTFQuery(input_query)
-    tfidf_query = computeTFIDFQuery(tf_query=tf_query, idf_corpus=idf_corpus)
-    relevant_documents = retrievePotentialDocuments(query)
-    scores_ = 0
-    print "Ranking documents..."
+# def user_input():
+#     input_query = input('Please Enter a query: ')
+#     tf_query = computeTFQuery(input_query)
+#     tfidf_query = computeTFIDFQuery(tf_query=tf_query, idf_corpus=idf_corpus)
+#     relevant_documents = retrievePotentialDocuments(query)
+#     scores_ = 0
+#     print "Ranking documents..."
 
 
 if __name__ == "__main__":
@@ -307,7 +306,7 @@ if __name__ == "__main__":
     print "Document (top): " + str(documents.items()[:1])
     # term_frequency_dict = computeTF(documents)
     # tf_corpus = computeTFDocument(documents)
-    tf_corpus = computeTFProper(documents)
+    tf_corpus = computeTF(documents)
     print("Term Frequency (5 elements): " + str(tf_corpus.items()[:5]))
     print colored("Elapsed time (Term frequency): %.4fs" % (time.time() - start_time), 'green')
 
@@ -343,7 +342,8 @@ if __name__ == "__main__":
     print ""
 
     # query = str(input('Please enter query: \n'))
-    query = "Ink drive democracy in Asia"
+    # query = "Digital guru floats sub-$100 PC"
+    query = "Ink helps drive democracy in Asia"
     print "Query: " + query
 
     query = stemWord(tokenize(query))
@@ -359,14 +359,16 @@ if __name__ == "__main__":
     print "TF-IDF Document: " + str(tfidf)
     print ""
 
+    print retrievePotentialDocuments(query)
+    print ""
+
     relevant_documents = set(x for l in retrievePotentialDocuments(query).values() for x in l)
     print "Relevant documents: " + str(relevant_documents)
     print ""
 
-    # print "Scores: " + str(computeDocumentScore(tfidf_query, tf_corpus, relevant_documents))
-    print "Scores: " + str(computeDocumentScore(tfidf_query, tfidf, relevant_documents))
-
-    print "Done.."
+    scores = computeDocumentScore(tfidf_query, tfidf, relevant_documents)
+    pp.pprint("Scores: " + str(scores))
+    pp.pprint("Rank: " + str(ranking(scores, 5)))
+    print "Done."
 
     print colored("Elapsed time: %.4fs" % (time.time() - start_time_total), 'green')
-

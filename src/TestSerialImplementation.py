@@ -43,7 +43,7 @@ class TestSerialImplementation(unittest.TestCase):
         self.assertEqual(len(serialImpl.documents), 50)
 
     def test_tf(self):
-        self.term_frequency_dict = serialImpl.computeTFProper(serialImpl.documents)
+        self.term_frequency_dict = serialImpl.computeTF(serialImpl.documents)
         self.assertEqual(20, len(self.term_frequency_dict))
         self.assertEqual(0, check_tf_results(self.test_case_TF_tuples_in_doc1, self.term_frequency_dict))
         print json.dumps(self.term_frequency_dict)
@@ -57,7 +57,7 @@ class TestSerialImplementation(unittest.TestCase):
         print("IDF: " + str(len(self.document_freq.items())))
 
     def test_tfidf(self):
-        self.term_frequency_dict = serialImpl.computeTFProper(serialImpl.documents)
+        self.term_frequency_dict = serialImpl.computeTF(serialImpl.documents)
         self.document_freq = serialImpl.computeIDF(serialImpl.documents)
         self.tfidf = serialImpl.compute_tfidfDocuments(len(serialImpl.documents), self.term_frequency_dict, self.document_freq)
         self.assertEqual(7992, len(self.tfidf))
@@ -66,11 +66,13 @@ class TestSerialImplementation(unittest.TestCase):
         print("TFIDF: " + str(len(self.tfidf)))
 
     def test_computeTFQuery(self):
-        print serialImpl.computeTFQuery("Ink helps drive democracy in Asia")
+        query = "Ink helps drive democracy in Asia asia"
+        clean_query = serialImpl.stemWord(serialImpl.tokenize(query))
+        print serialImpl.computeTFQuery(clean_query)
 
     def test_computeTFIDFQuery(self):
         docs = serialImpl.documents
-        self.term_frequency_dict = serialImpl.computeTFProper(docs)
+        self.term_frequency_dict = serialImpl.computeTF(docs)
         self.document_freq = serialImpl.computeIDF(docs)
         self.tfidf = serialImpl.compute_tfidfDocuments(len(serialImpl.documents), self.term_frequency_dict, self.document_freq)
 
@@ -78,7 +80,7 @@ class TestSerialImplementation(unittest.TestCase):
 
     def test_computeDotProduct(self):
         docs = serialImpl.documents
-        res = serialImpl.computeTFProper(docs)
+        res = serialImpl.computeTF(docs)
         print res
 
 
