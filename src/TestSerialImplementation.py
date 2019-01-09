@@ -1,5 +1,9 @@
 import json
+import os
 import unittest
+
+from termcolor import colored
+
 import serialImplementation as serialImpl
 from collections import Counter
 
@@ -44,8 +48,15 @@ class TestSerialImplementation(unittest.TestCase):
 
     def test_tf(self):
         self.term_frequency_dict = serialImpl.computeTF(serialImpl.documents)
-        self.assertEqual(20, len(self.term_frequency_dict))
-        self.assertEqual(0, check_tf_results(self.test_case_TF_tuples_in_doc1, self.term_frequency_dict))
+        self.assertEqual(50, len(self.term_frequency_dict))
+
+        list_of_terms = self.term_frequency_dict.get("001.txt")
+        counter = 0.0
+        for tup in list_of_terms:
+            counter += tup[1]
+
+        print counter
+
         print json.dumps(self.term_frequency_dict)
         print("TF Size: " + str(len(self.term_frequency_dict)))
 
@@ -60,8 +71,12 @@ class TestSerialImplementation(unittest.TestCase):
         self.term_frequency_dict = serialImpl.computeTF(serialImpl.documents)
         self.document_freq = serialImpl.computeIDF(serialImpl.documents)
         self.tfidf = serialImpl.compute_tfidfDocuments(len(serialImpl.documents), self.term_frequency_dict, self.document_freq)
-        self.assertEqual(7992, len(self.tfidf))
-        self.assertEqual(5, check_against_results(self.test_case_TFIDF_tuples, self.tfidf))
+        self.assertEqual(50, len(self.tfidf))
+        # self.assertEqual(5, check_against_results(self.test_case_TFIDF_tuples, self.tfidf))
+
+        with open('resource/test_serial_tfidf.json', 'w') as outfile:
+            json.dump(self.tfidf, outfile, indent=4, sort_keys=True)
+            print colored("TEST_TFIDF saved to: " + os.path.realpath(outfile.name), 'cyan')
 
         print("TFIDF: " + str(len(self.tfidf)))
 
