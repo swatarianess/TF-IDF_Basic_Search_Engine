@@ -67,6 +67,24 @@ def cleanDocuments(document_map):
     return result
 
 
+def computeTFnIDF(documents):
+    result = {}
+    for document_name, document_terms in documents.items():  # Iterate over documents in the collection
+        result[document_name] = list()  # Initialize key in result dictionary, Value = List()
+        count_dictionary = dict()  # Temporary dictionary to keep count of keys, Key = Word, Value = Count
+        for word in document_terms:  # Iterate through words in the document
+            if word in count_dictionary.keys():  # Check word
+                count_dictionary[word] = (1 + count_dictionary[word])
+            else:
+                count_dictionary[word] = 1
+                if word in idf_corpus:
+                    idf_corpus[word] += 1
+                else:
+                    idf_corpus[word] = 1
+        result[document_name] = count_dictionary.items()
+    return result
+
+
 def computeTF(documents):
     """
         Calculate the term frequency
@@ -75,13 +93,13 @@ def computeTF(documents):
     :return: Returns dictionary of terms with their term-frequency.
     """
     result = {}
+
     for document_name, document_terms in documents.items():  # Iterate keys
         distinct_terms = set(document_terms)  # Set of distinct terms in a document
         result[document_name] = []  # key = document, value = list of tuple(term,score)
         for term in distinct_terms:
             score = float(document_terms.count(term)) / len(document_terms)  # Normalized TF score
             result[document_name].append((term, score))
-
     return result
 
 
@@ -97,21 +115,18 @@ def computeIDF(documents):
     # Gets tokenized + stemmed corpus, gets distinct values, swaps key and value, counts key appearance
     result = {}  # type: dict[str,int]
 
-    for a in word_corpus:  # Populate results + postings list
-        result[a] = 0
-        postings[a] = []
-
     for document_name, doc_content in documents.items():
         for term in word_corpus:
+            result[term] = 0
+            postings[term] = []
             if term in doc_content:
                 result[term] += 1
                 postings[term].append(document_name)
-
     return result
 
 
 def compute_tfidfDocuments(number_of_documents, term_frequency, document_frequency):
-    # type: (int, dict, dict) -> dict[list]
+    # type: # (int, dict, dict) -> dict[list]
     """
         Calculates tfidf scores for all distinct terms in the corpus
 
@@ -121,18 +136,21 @@ def compute_tfidfDocuments(number_of_documents, term_frequency, document_frequen
     :param document_frequency: A list of tuples: [{term, df_score}]
     :return: Returns a dictionary listed tuples: { "001.txt": [("sector", 1.6094379), ("embassi", 2.302585), ()]}
     """
+    if document_frequency is None:
+        document_frequency = idf_corpus
+
     results = {}  # type: dict[list]
     for key, value in term_frequency.items():
         for word in value:
             term = word[0]
-            tf = word[1]
+            tf = float(word[1]) / len(documents[key])  # check if this is correct. tf = raw_count / length_document
             tf_idf_score = 0
             document_frequency_of_term = document_frequency[term]
             if document_frequency_of_term > 0:
-                idf = math.log10(1.0 + (float(number_of_documents) / document_frequency_of_term))
+                idf = math.log10(1.0 + (float(number_of_documents) / float(document_frequency_of_term)))
                 tf_idf_score = tf * idf
             if key in results:
-                results.get(key).append((term, tf_idf_score))
+                results.get(key).append((term, float(tf_idf_score)))
             else:
                 results[key] = [(term, tf_idf_score)]
     return results
@@ -186,7 +204,6 @@ def computeTFQuery(query):
     # type: (list) -> dict
     result = {}
     distinct_terms = set(query)
-
     for term in distinct_terms:
         result[term] = float(query.count(term))
     return result
@@ -213,7 +230,6 @@ def retrievePotentialDocuments(query):
     :return:
     """
     result = {}
-
     for term in query:
         result[term] = postings.get(term)
 
@@ -247,6 +263,12 @@ def ranking(scores, k_amount):
     return [i[0] for i in sorted_list]
 
 
+def saveVariable(var, name):
+    with open('resource/' + name + '.json', 'w') as outfile:
+        json.dump(var, outfile, indent=4, sort_keys=True)
+        print colored("Saved " + name + " to: " + os.path.realpath(outfile.name), 'cyan')
+
+
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("-dataDir",
@@ -268,9 +290,7 @@ if __name__ == "__main__":
         outfile.writelines("\n".join(stopWords))
         print colored("Stop-words saved to: " + os.path.realpath(outfile.name), 'cyan')
 
-    with open('resource/serial_documents.json', 'w') as outfile:
-        json.dump(documents, outfile, indent=4, sort_keys=True)
-        print colored("Documents saved to: " + os.path.realpath(outfile.name), 'cyan')
+    # saveVariable(documents, "Documents")
 
     print("Document count: " + str(len(documents)))
     print("Word corpus size: " + str(len(word_corpus)))
@@ -279,72 +299,47 @@ if __name__ == "__main__":
     # Create and save word corpus
     start_time = time.time()
     word_corpus = list(set(word_corpus))
-    # print("Word corpus (distinct): " + str(len(word_corpus)))
-    # print("Corpus directory: " + saveCorpus(word_corpus, 'resource/serial_word_corpus.json'))
     print colored("Elapsed time (Word corpus): %.4fs" % (time.time() - start_time), 'green')
 
     #####################################################
     # Calculate Term Frequencies #
     start_time = time.time()
-    tf_corpus = computeTF(documents)
-    # print("Term Frequency (5 elements): " + str(tf_corpus.items()[:5]))
+    tf_corpus = computeTFnIDF(documents)
     print colored("Elapsed time (Term frequency): %.4fs" % (time.time() - start_time), 'green')
-
-    with open('resource/serial_tf.json', 'w') as outfile:
-        json.dump(tf_corpus, outfile, sort_keys=True, indent=4)
-        print colored("TF saved to: " + os.path.realpath(outfile.name), 'cyan')
+    saveVariable(tf_corpus, 'Serial_TF')
     print ""
-    #####################################################
-
-    #####################################################
-    # Calculate IDF values
-    start_time = time.time()
-    idf_corpus = computeIDF(documents)
-    # print "IDF (001.txt, 5 Elements): " + str(idf_corpus)
-    print colored("Elapsed time (IDF): %.4fs" % (time.time() - start_time), 'green')
-
-    with open('resource/serial_IDF.json', 'w') as outfile:
-        json.dump(sorted(idf_corpus.items(), key=lambda x: x[1], reverse=True), outfile, indent=4)
-        print colored("IDF saved to: " + os.path.realpath(outfile.name), 'cyan')
-
-    with open('resource/serial_Postings.json', 'w') as outfile:
-        json.dump(postings, outfile, indent=4)
-        print colored("Postings saved to: " + os.path.realpath(outfile.name), 'cyan')
-    print""
     #####################################################
 
     #####################################################
     # Calculate TFIDF values
     start_time = time.time()
-    tfidf = compute_tfidfDocuments(len(documents), tf_corpus, idf_corpus)
+    tfidf = compute_tfidfDocuments(len(documents), tf_corpus, None)
     # print("TFIDF (5 Elements): " + str(tfidf.items()[:5]))
     print colored("Elapsed time (TFIDF): %.4fs" % (time.time() - start_time), 'green')
 
-    with open('resource/serial_TFIDF.json', 'w') as outfile:
-        json.dump(tfidf, outfile, indent=4, sort_keys=True)
-        print colored("TFIDF saved to: " + os.path.realpath(outfile.name), 'cyan')
+    saveVariable(tfidf, 'TFIDF')
     #####################################################
     print colored("Index time: %.4fs" % (time.time() - start_time_total), 'green')
 
-    while True:
-        query = input('Please enter a query: \n')
-        raw_query = query
-        start_time = time.time()
-
-        query = stemWord(tokenize(str(query)))
-        tf_query = computeTFQuery(query)
-        tfidf_query = computeTFIDFQuery(tf_query=tf_query, idf_corpus=idf_corpus)
-        potential_docs = retrievePotentialDocuments(query)
-        if len(potential_docs.values()) > 0 and None not in potential_docs.values():
-            relevant_documents = set(x for l in potential_docs.values() for x in l)
-            pprint.pprint("Relevant documents: " + str(relevant_documents))
-            print ""
-
-            scores = computeDocumentScore(tfidf_query, tfidf, relevant_documents)
-            print "Scores:" + str(scores)
-            print "Rank:" + str(ranking(scores, 5)) + '\n'
-            print colored("Query time: %.4fs" % (time.time() - start_time), 'cyan')
-            print ''
-        else:
-            print colored("No documents for query: " + ''.join(raw_query), 'red')
-            print ""
+    # while True:
+    #     query = input('Please enter a query: \n')
+    #     raw_query = query
+    #     start_time = time.time()
+    #
+    #     query = stemWord(tokenize(str(query)))
+    #     tf_query = computeTFQuery(query)
+    #     tfidf_query = computeTFIDFQuery(tf_query=tf_query, idf_corpus=idf_corpus)
+    #     potential_docs = retrievePotentialDocuments(query)
+    #     if len(potential_docs.values()) > 0 and None not in potential_docs.values():
+    #         relevant_documents = set(x for l in potential_docs.values() for x in l)
+    #         pprint.pprint("Relevant documents: " + str(relevant_documents))
+    #         print ""
+    #
+    #         scores = computeDocumentScore(tfidf_query, tfidf, relevant_documents)
+    #         print "Scores:" + str(scores)
+    #         print "Rank:" + str(ranking(scores, 5)) + '\n'
+    #         print colored("Query time: %.4fs" % (time.time() - start_time), 'cyan')
+    #         print ''
+    #     else:
+    #         print colored("No documents for query: " + ''.join(raw_query), 'red')
+    #         print ""
